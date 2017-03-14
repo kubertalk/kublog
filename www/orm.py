@@ -93,18 +93,32 @@ class TextField(Field):
     def __init__(self, name=None, default=None):
         super().__init__(name, 'text', False, default)
 
+# 定义Model的元类，所有的元类都继承自type
+# ModelMetaclass元类定义了所有Model基类的子类实现的操作
+# ModelMetaclass主要就是为把数据库表映射成封装的类做准备
+
+# 当前类中查找所有的类属性（attrs),如果找到Field属性，就将其保存到__mappings__的dict中，同时从属性中删除Field      
+
 class ModelMetaclass(type):
+    # __new__控制__init__的执行
+    # cls:代表将要__init__的类
+    # bases:代表继承父类的集合
+    # attrs:类的方法集合
 
     def __new__(cls, name, bases, attrs):
+        # 排除Model
         if name=='Model':
             return type.__new__(cls, name, bases, attrs)
+        # 获取table名词
         tableName = attrs.get('__table__', None) or name
         logging.info('found model: %s (table: %s)' % (name, tableName))
+        #获取Field和主键名
         mappings = dict()
         fields = []
         primaryKey = None
         for k, v in attrs.items():
             if isinstance(v, Field):
+                #此处打印k是类的一个属性，v是这个属性在数据库中对应的Field列表属性
                 logging.info(' found mapping： %s ==> %s' % (k, v))
                 mappings[k] = v
                 if v.primary_key:
@@ -114,20 +128,33 @@ class ModelMetaclass(type):
                     primaryKey = k
                 else:
                     fields.append(k)
-            if not primaryKey:
-                raise StandardError('Primary key not found.')
-            for k in mappings.keys():
-                attrs.pop(k)
-            escaped_fields = list(map(lambda f: '`%s`' % f, fields))
-            attrs['__mappings__'] = mappings # 保存属性和列的映射关系
-            attrs['__table__'] = tableName
-            attrs['__primary_key__'] = primaryKey #主键属性名
-            attrs['__field__'] = fields # 除主键外的属性名
-            attrs['__select__'] = 'select `%s`, %s from `%s`' % (primaryKey, ','.join(escaped_fields), tableName)
-            attrs['__insert__'] = 'insert into `%s` (%s, `%s`) values (%s)' % (tableName, ','.join(escaped_fields), primaryKey, create_args_string(len(escaped_fields)+1))
-            attrs['__update__'] = 'update `%s` set %s where `%s` = ?' % (tableName, ','.join(map(lambda f: '`%s` = ?' % (mappings.get(f).name or f),fields)), primaryKey)
-            attrs['__delete__'] = 'delete from `%s` where `%s` = ?' % (tableName,primaryKey)
-            return type.__new__(cls, name, bases, attrs)
+        #end for
+        if not primaryKey:
+            raise StandardError('Primary key not found.')
+        # 从类属性中删除Field属性
+        for k in mappings.keys():
+            attrs.pop(k)
+        
+        escaped_fields = list(map(lambda f: '`%s`' % f, fields)) # 保存除主键外的属性名为``（运算出字符串）列表形式
+        attrs['__mappings__'] = mappings # 保存属性和列的映射关系
+        attrs['__table__'] = tableName # 保存表名
+        attrs['__primary_key__'] = primaryKey #保存主键属性名
+        attrs['__field__'] = fields # 保存除主键外的属性名
+        # 构造默认的SELECT/INSERT/UPDATE/DELETE语句
+        # ` `反引号功能同repr()
+        attrs['__select__'] = 'select `%s`, %s from `%s`' % (primaryKey, ','.join(escaped_fields), tableName)
+        attrs['__insert__'] = 'insert into `%s` (%s, `%s`) values (%s)' % (tableName, ','.join(escaped_fields), primaryKey, create_args_string(len(escaped_fields)+1))
+        attrs['__update__'] = 'update `%s` set %s where `%s` = ?' % (tableName, ','.join(map(lambda f: '`%s` = ?' % (mappings.get(f).name or f),fields)), primaryKey)
+        attrs['__delete__'] = 'delete from `%s` where `%s` = ?' % (tableName,primaryKey)
+        return type.__new__(cls, name, bases, attrs)
+
+# 定义ORM所有映射的基类：Model
+# Model类的任意子类可以映射一个数据库表
+# Model类可以看作是对所有数据库表操作的基本定义的映射
+
+# 基于字典查询形式
+# Model从dict继承，拥有字典的所有功能，同时实现特殊方法__getattr__和__setattr__，能够实现属性操作
+# 实现数据库操作的所有方法，定义为class方法，所有继承自Model都具有数据库操作方法        
 class Model(dict, metaclass=ModelMetaclass):
     """docstring for Model"""
     def __init__(self, **kw):
