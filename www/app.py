@@ -20,12 +20,12 @@ add by kuber begined at 2017.03.14
 from jinja2 import Environment, FileSystemLoader
 
 import orm
-from coroweb import add_route, add_static
+from coroweb import add_routes, add_static
 
 def init_jinja2(app, **kw):
     logging.info('init jinja2...')
-    option = dict(
-        autoescape = kw,get('autoescape',True),
+    options = dict(
+        autoescape = kw.get('autoescape', True),
         block_start_string = kw.get('block_start_string','%}'),
         block_end_string = kw.get('block_end_string', '%}'),
         variable_start_string = kw.get('variable_start_string', '{{'),
@@ -39,8 +39,8 @@ def init_jinja2(app, **kw):
     env = Environment(loader = FileSystemLoader(path), **options)
     filters = kw.get('filters', None)
     if filters is not None:
-        for name, f in filters.item():
-            env.filters[names] = f
+        for name, f in filters.items():
+            env.filters[name] = f
     app['__templating'] = env
 
 # 一个记录URL日志的logger可以简单定义如下：
@@ -67,7 +67,7 @@ async def data_factory(app, handler):
 
 # 而response这个middleware把返回值转换为web.Response对象再返回，以保证满足aiohttp的要求
 async def response_factory(app, handler):
-    async def respose(request):
+    async def response(request):
         # 结果：
         logging.info('Response handler...')
         r = await handler(request)
@@ -119,22 +119,22 @@ add by Kuber finished at 3.22
     #return web.Response(body=b'<h1>Wo Ai NanNan</h1>', content_type='text/html',charset='UTF-8')
 
 #@asyncio.coroutine
-def init(loop):
-    await orm.create_pool(loop=loop, host='127.0.0.1', port=3306, user='www', password='www', db='awesome')
+async def init(loop):
+    await orm.create_pool(loop=loop, host='127.0.0.1', port=3306, user='www-data', password='www-data', db='awesome')
     #app = web.Application(loop=loop)
     # 加入middleware、jinja2模板和自注册的支持
     # middleware是一种拦截器，一个URL在被某个函数处理前，可以经过一系列的middleware的处理
     # middleware的用处就在于把通用的功能从每个URL处理函数中拿出来，集中放到一个地方
     # 例如，logger的定义在上面可以看到
-    app = web.Application(loop=loop,middleware=[
+    app = web.Application(loop=loop, middlewares=[
         logger_factory, response_factory
     ])
     init_jinja2(app, filters=dict(datetime=datatime_filter))
-    add_route(app, 'handlers')
+    add_routes(app, 'handlers')
     add_static(app)
     # 加入middleware、jinja2模板和自注册的支持
     #app.router.add_route('GET','/',index)
-    srv = yield from loop.create_server(app.make_handler(),'127.0.0.1', 9000)
+    srv = await loop.create_server(app.make_handler(),'127.0.0.1', 9000)
     #ssrv = yield from loop.create_server(app.make_handler(), '127.0.0.1', 9000)
     logging.info('server started at http://127.0.0.1:9000...')
     return srv
