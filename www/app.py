@@ -15,7 +15,7 @@ from datetime import datetime
 
 from aiohttp import web
 '''
-add by kuber at 2017.03.14
+add by kuber begined at 2017.03.14
 '''
 from jinja2 import Environment, FileSystemLoader
 
@@ -43,10 +43,13 @@ def init_jinja2(app, **kw):
             env.filters[names] = f
     app['__templating'] = env
 
+# 一个记录URL日志的logger可以简单定义如下：
 async def logger_factory(app, handler):
     async def logger(request):
+        # 记录日志
         logging.info('Request: %s %s' % (request.method, request.path))
         # await asyncio.sleep(0,3)
+        # 继续处理请求
         return (await handler(request))
     return logger
 
@@ -62,8 +65,10 @@ async def data_factory(app, handler):
         return (await handler(request))
     return parse_data
 
+# 而response这个middleware把返回值转换为web.Response对象再返回，以保证满足aiohttp的要求
 async def response_factory(app, handler):
     async def respose(request):
+        # 结果：
         logging.info('Response handler...')
         r = await handler(request)
         if isinstance(r, web.StreamResponse):
@@ -117,12 +122,17 @@ add by Kuber finished at 3.22
 def init(loop):
     await orm.create_pool(loop=loop, host='127.0.0.1', port=3306, user='www', password='www', db='awesome')
     #app = web.Application(loop=loop)
+    # 加入middleware、jinja2模板和自注册的支持
+    # middleware是一种拦截器，一个URL在被某个函数处理前，可以经过一系列的middleware的处理
+    # middleware的用处就在于把通用的功能从每个URL处理函数中拿出来，集中放到一个地方
+    # 例如，logger的定义在上面可以看到
     app = web.Application(loop=loop,middleware=[
         logger_factory, response_factory
     ])
     init_jinja2(app, filters=dict(datetime=datatime_filter))
     add_route(app, 'handlers')
     add_static(app)
+    # 加入middleware、jinja2模板和自注册的支持
     #app.router.add_route('GET','/',index)
     srv = yield from loop.create_server(app.make_handler(),'127.0.0.1', 9000)
     #ssrv = yield from loop.create_server(app.make_handler(), '127.0.0.1', 9000)

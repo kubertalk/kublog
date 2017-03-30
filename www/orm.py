@@ -183,6 +183,7 @@ class Model(dict, metaclass=ModelMetaclass):
             return value
 
     @classmethod
+    # 根据WHERE条件查找；
     async def findAll(cls, where=None, args=None, **kw):
         'find objects by where clause.'
         sql = [cls.__select__]
@@ -210,6 +211,7 @@ class Model(dict, metaclass=ModelMetaclass):
         return [cls(**r) for r in rs]
 
     @classmethod
+    # 根据WHERE条件查找，但返回的是整数，适用于select count(*)类型的SQL
     async def  findNumber(cls, selectField, where=None, args=None):
         'find number by select and where.'
         sql = ['select %s _num_ from `%s`' % (selectField, cls.__table__)]
