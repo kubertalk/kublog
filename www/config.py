@@ -31,7 +31,7 @@ class Dict(dict):
 
 def merge(defaults, override):
     r = {}
-    for k, v i defaults.items():
+    for k, v in defaults.items():
         if k in override:
             if isinstance(v, dict):
                 r[k] = merge(v, override[k])
